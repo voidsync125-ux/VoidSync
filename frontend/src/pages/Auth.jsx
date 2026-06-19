@@ -319,8 +319,9 @@ export default function Auth({ onAuthSuccess, onBack }) {
   };
 
   // Base URL of the backend API. In Vite, set VITE_API_URL in .env
-  // (e.g. VITE_API_URL=http://localhost:5000). Falls back to localhost:5000.
-  const API_URL = import.meta.env.VITE_API_URL || "http://voidsync-rnvm.onrender.com";
+  // Render backend base should be https://voidsync-rnvm.onrender.com
+  const API_URL = (import.meta.env.VITE_API_URL || "https://voidsync-rnvm.onrender.com").replace(/\/+$/, "");
+
 
   const handleSubmit = async () => {
     const e = validate();
