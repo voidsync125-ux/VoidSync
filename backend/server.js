@@ -18,6 +18,14 @@ function requireEnv(keys) {
 // Validate critical env vars early so Render shows a clear startup error
 requireEnv(["MONGO_URI", "JWT_SECRET"]);
 
+// Ensure frontend origin is allowed by CORS (needed for deployed frontend)
+// Render backend: https://voidsync-rnvm.onrender.com
+// Frontend (Vercel): https://voidsync.vercel.app
+if (!process.env.CLIENT_URL) {
+  process.env.CLIENT_URL = "https://voidsync.vercel.app";
+}
+
+
 // Routes
 const authRoutes   = require("./routes/auth");
 const roomRoutes   = require("./routes/rooms");
