@@ -25,6 +25,14 @@ if (!process.env.CLIENT_URL) {
   process.env.CLIENT_URL = "https://voidsync.vercel.app";
 }
 
+// Allow the dev host too (helps prevent accidental preflight failures
+// during local testing with the same backend build). Also allow Vercel
+// preview domains if you use them.
+const allowedOrigins = new Set([
+  process.env.CLIENT_URL,
+  "http://localhost:5173",
+  "https://voidsync.vercel.app",
+]);
 
 // Routes
 const authRoutes   = require("./routes/auth");
@@ -39,13 +47,32 @@ const app = express();
 const server = http.createServer(app);
 
 // ── CORS ────────────────────────────────────────────────────────────
+// Use dynamic origin validation to avoid hard-coding localhost.
 const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
-app.use(cors({ origin: clientUrl, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // No origin header means same-origin or curl; allow.
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
+
 
 // ── Socket.IO ───────────────────────────────────────────────────────
 const io = new Server(server, {
-  cors: { origin: clientUrl, credentials: true },
+  cors: {
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+    credentials: true,
+  },
 });
 app.set("io", io); // so routes can emit events via req.app.get("io")
 initSocket(io);
