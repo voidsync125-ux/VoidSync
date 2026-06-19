@@ -366,7 +366,9 @@ export default function Auth({ onAuthSuccess, onBack }) {
     } catch (err) {
       console.error("Auth request failed:", err);
       setLoading(false);
-      setErrors({ email: `Couldn't reach the server. Backend: ${API_URL}${endpoint} (check Render status, CORS, and env vars)` });
+      setErrors({
+        email: `Couldn't reach the server. Backend: ${API_URL}${isLogin ? "/api/auth/login" : "/api/auth/signup"} (check Render status, CORS, and env vars)`,
+      });
     }
   };
 
