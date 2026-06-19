@@ -7,6 +7,17 @@ const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const initSocket = require("./sockets");
 
+function requireEnv(keys) {
+  const missing = keys.filter((k) => !process.env[k]);
+  if (missing.length) {
+    console.error("✕ Missing required env vars:", missing.join(", "));
+    process.exit(1);
+  }
+}
+
+// Validate critical env vars early so Render shows a clear startup error
+requireEnv(["MONGO_URI", "JWT_SECRET"]);
+
 // Routes
 const authRoutes   = require("./routes/auth");
 const roomRoutes   = require("./routes/rooms");
@@ -58,10 +69,8 @@ app.use((err, req, res, next) => {
 // ── Start ───────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
+// Start listening only once (Render EADDRINUSE happens when we bind twice).
+// Start after DB connects so routes relying on DB don't fail early.
 connectDB().then(() => {
   server.listen(PORT, () => {
     console.log(`✦ VoidSync server running on port ${PORT}`);
