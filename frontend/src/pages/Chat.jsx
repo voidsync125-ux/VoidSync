@@ -643,7 +643,7 @@ function MessageInput({ channelLabel, onSend, replyTo, clearReply, isMobile, onT
   const chunksRef  = useRef([]);
   const timerRef   = useRef(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API_URL = import.meta.env.VITE_API_URL || "http://voidsync-rnvm.onrender.com";
 
   const send = () => {
     if (!text.trim()) return;

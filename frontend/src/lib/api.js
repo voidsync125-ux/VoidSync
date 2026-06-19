@@ -2,7 +2,7 @@
 // Centralized fetch wrapper: attaches the JWT, handles JSON, and
 // throws readable errors. Used by Dashboard, Chat, and Profile pages.
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://voidsync-rnvm.onrender.com";
 
 function getToken() {
   return localStorage.getItem("voidsync_token");
