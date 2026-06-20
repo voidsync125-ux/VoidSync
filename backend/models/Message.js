@@ -72,11 +72,17 @@ messageSchema.methods.toPublicJSON = function () {
     author: this.author, // populate before sending for username/color
     type: this.type,
     text: this.deletedAt ? null : this.text,
+    // Frontend expects:
+    // - msg.type === "voice" and msg.fileUrl for <audio src>
+    // - msg.type in ["file","image"] and msg.fileUrl for downloads/images
+    // Backend stores voice audio in voiceUrl, so normalize it to fileUrl.
+    // (Keeps voiceUrl too for backward compatibility.)
     voiceUrl: this.voiceUrl,
     duration: this.duration,
-    fileUrl: this.fileUrl,
+    fileUrl: this.type === "voice" ? this.voiceUrl : this.fileUrl,
     fileName: this.fileName,
     fileSize: this.fileSize,
+    // replyTo is populated as an object; frontend expects replyTo.author.username + replyTo.text
     replyTo: this.replyTo,
     reactions,
     edited: !!this.editedAt,
