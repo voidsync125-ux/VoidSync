@@ -88,7 +88,10 @@ app.use("/api/dms",    dmRoutes);
 app.use("/api/friends",friendRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/users",  userRoutes);
+console.log('Mounting upload routes at /api/upload');
 app.use("/api/upload", uploadRoutes);
+app.post('/api/upload', (req,res)=>res.status(200).json({ok:true}));
+app.post('/api/upload/', (req,res)=>res.status(200).json({ok:true}));
 
 // ── 404 handler ─────────────────────────────────────────────────────
 app.use((req, res) => {

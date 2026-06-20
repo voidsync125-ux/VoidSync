@@ -18,7 +18,7 @@ const router = express.Router();
 //   mimeType: "image/jpeg"
 // }
 router.post(
-  "/",
+  "",
   requireAuth,
   (req, res, next) => {
     // Run multer upload, catch multer-level errors (file too large, blocked type)
@@ -40,8 +40,12 @@ router.post(
       if (mime.startsWith("image/")) type = "image";
       else if (mime.startsWith("audio/")) type = "voice";
 
+      const secureUrl =
+        req.file?.secure_url ||
+        req.file?.path; // fallback for older configs
+
       res.json({
-        url:      req.file.path,         // Cloudinary secure URL
+        url: secureUrl,
         type,
         fileName: req.file.originalname,
         fileSize: req.file.size,
