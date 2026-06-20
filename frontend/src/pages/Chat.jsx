@@ -59,11 +59,13 @@ export default function Chat({ initialTarget, onBack }) {
     setMessages((m) => [...m, optimistic]);
 
     try {
+      const payload = { type: "text", text: body };
       if (target.type === "dm") {
-        await api.post(`/api/dms/${target.id}/messages`, { body });
+        await api.post(`/api/dms/${target.id}/messages`, payload);
       } else {
-        await api.post(`/api/rooms/${target.id}/messages`, { body });
+        await api.post(`/api/rooms/${target.id}/messages`, payload);
       }
+
 
       // Re-fetch to get authoritative messages
       const path = target.type === "dm"
