@@ -643,7 +643,9 @@ function MessageInput({ channelLabel, onSend, replyTo, clearReply, isMobile, onT
   const chunksRef  = useRef([]);
   const timerRef   = useRef(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  // IMPORTANT: uploads must go to the same backend as all other API calls
+  // (Render URL in VITE_API_URL). Defaulting to localhost breaks deployments.
+  const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "https://voidsync-rnvm.onrender.com";
 
   const send = () => {
     if (!text.trim()) return;
