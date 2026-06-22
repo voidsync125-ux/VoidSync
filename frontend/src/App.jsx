@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -10,59 +10,13 @@ import { api } from "./lib/api";
 const AUTH_PAGES = ["dashboard", "chat"];
 
 function App() {
+  const [bootGate, setBootGate] = useState(false); // true after SolarLoader word forming
   const [page, setPage] = useState(null); // null = still booting
+  const pendingNextPageRef = useRef(null);
+  const pendingNavAppliedRef = useRef(false);
   const [chatTarget, setChatTarget] = useState(null);
   const [joinStatus, setJoinStatus] = useState(null);
   const [joinMessage, setJoinMessage] = useState("");
-
-  // ── Boot sequence ──────────────────────────────────────────────────
-  // On every load: check for saved page + valid token.
-  // Show the solar loader while we verify so users see something nice.
-  useEffect(() => {
-    const token = localStorage.getItem("voidsync_token");
-    const savedPage = localStorage.getItem("voidsync_page") || "landing";
-    const savedChatTarget = localStorage.getItem("voidsync_chat_target");
-
-    // Handle invite link regardless of auth state
-    const inviteMatch = window.location.pathname.match(/^\/join\/([a-zA-Z0-9]+)$/);
-
-    if (!token) {
-      // No token — always go to landing (or auth if on an invite link)
-      setPage(inviteMatch ? "auth" : "landing");
-      return;
-    }
-
-    // Token exists — verify it's still valid
-    api.get("/api/auth/me")
-      .then(() => {
-        // Token valid — restore saved page
-        if (inviteMatch) {
-          handleInviteCode(inviteMatch[1]);
-          return;
-        }
-
-        // Restore chat target if returning to chat page
-        if (savedPage === "chat" && savedChatTarget) {
-          try { setChatTarget(JSON.parse(savedChatTarget)); } catch {}
-        }
-
-        setPage(AUTH_PAGES.includes(savedPage) ? savedPage : "dashboard");
-      })
-      .catch(() => {
-        // Token expired/invalid — clear it, go to landing
-        localStorage.removeItem("voidsync_token");
-        localStorage.removeItem("voidsync_user");
-        localStorage.removeItem("voidsync_page");
-        localStorage.removeItem("voidsync_chat_target");
-        setPage("landing");
-      });
-  }, []);
-
-  // ── Persist page to localStorage on every change ───────────────────
-  useEffect(() => {
-    if (!page) return;
-    localStorage.setItem("voidsync_page", page);
-  }, [page]);
 
   const navigate = (newPage, target = null) => {
     if (target) {
@@ -74,7 +28,7 @@ function App() {
     setPage(newPage);
   };
 
-  // ── Invite code handler ────────────────────────────────────────────
+  // ── Invite code handler (declared before boot effect) ─────────────
   const handleInviteCode = (code) => {
     setJoinStatus("joining");
     api.post(`/api/rooms/join-by-code/${code}`)
@@ -93,8 +47,73 @@ function App() {
 
   const goToChat = (type, id) => navigate("chat", { type, id });
 
+
+  // ── Boot sequence ──────────────────────────────────────────────────
+  useEffect(() => {
+    const token = localStorage.getItem("voidsync_token");
+    const savedPage = localStorage.getItem("voidsync_page") || "landing";
+    const savedChatTarget = localStorage.getItem("voidsync_chat_target");
+
+    // Handle invite link regardless of auth state
+    const inviteMatch = window.location.pathname.match(/^\/join\/([a-zA-Z0-9]+)$/);
+
+    // For non-token case, we also gate navigation behind SolarLoader completion.
+    const nextWithoutAuth = inviteMatch ? "auth" : "landing";
+
+    if (!token) {
+      pendingNextPageRef.current = nextWithoutAuth;
+      return;
+    }
+
+    api.get("/api/auth/me")
+      .then(() => {
+        if (inviteMatch) {
+          handleInviteCode(inviteMatch[1]);
+          return;
+        }
+
+        if (savedPage === "chat" && savedChatTarget) {
+          try { setChatTarget(JSON.parse(savedChatTarget)); } catch {}
+        }
+
+        pendingNextPageRef.current = AUTH_PAGES.includes(savedPage) ? savedPage : "dashboard";
+      })
+      .catch(() => {
+        localStorage.removeItem("voidsync_token");
+        localStorage.removeItem("voidsync_user");
+        localStorage.removeItem("voidsync_page");
+        localStorage.removeItem("voidsync_chat_target");
+        pendingNextPageRef.current = "landing";
+      });
+  }, []);
+
+  // Apply gated navigation once SolarLoader signals completion.
+  useEffect(() => {
+    if (!bootGate) return;
+    if (pendingNavAppliedRef.current) return;
+    if (!pendingNextPageRef.current) return;
+    pendingNavAppliedRef.current = true;
+    setPage(pendingNextPageRef.current);
+  }, [bootGate]);
+
+  // ── Persist page to localStorage on every change ───────────────────
+  useEffect(() => {
+    if (!page) return;
+    localStorage.setItem("voidsync_page", page);
+  }, [page]);
+
   // ── Still booting ──────────────────────────────────────────────────
-  if (!page) return <SolarLoader message="Syncing with the Void…" />;
+  if (!page) {
+    return (
+      <SolarLoader
+        message="Syncing with the Void…"
+        onWordFormed={() => {
+          setBootGate(true);
+        }}
+      />
+    );
+  }
+
 
   // ── Invite link status screen ──────────────────────────────────────
   if (joinStatus) {
