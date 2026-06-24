@@ -637,16 +637,17 @@ function FriendRow({ f, dmBusyId, onDm }) {
 // ─── VIEW: FRIENDS ────────────────────────────────────────────────────
 function FriendsView({ onOpenDm }) {
   // ── ALL hooks must be at the top, unconditionally ──────────────────
-  const [friends,    setFriends]    = useState([]);
-  const [requests,   setRequests]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState(null);
-  const [busyId,     setBusyId]     = useState(null);
-  const [dmBusyId,   setDmBusyId]   = useState(null);
-  const [search,     setSearch]     = useState("");
-  const [results,    setResults]    = useState([]);
-  const [searching,  setSearching]  = useState(false);
-  const [addStatus,  setAddStatus]  = useState(null);
+  const [friends,     setFriends]     = useState([]);
+  const [requests,    setRequests]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
+  const [busyId,      setBusyId]      = useState(null);
+  const [dmBusyId,    setDmBusyId]    = useState(null);
+  const [search,      setSearch]      = useState("");
+  const [results,     setResults]     = useState([]);
+  const [searching,   setSearching]   = useState(false);
+  const [addStatus,   setAddStatus]   = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
 
   const load = () => {
     setLoading(true);
@@ -656,7 +657,13 @@ function FriendsView({ onOpenDm }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Load suggestions on mount (non-blocking, fails silently)
+    api.get("/api/friends/suggestions?limit=12")
+      .then(({ suggestions }) => setSuggestions(suggestions || []))
+      .catch(() => {});
+  }, []);
 
   // Debounced search
   useEffect(() => {
@@ -687,6 +694,8 @@ function FriendsView({ onOpenDm }) {
       const res = await api.post("/api/friends/requests", { username });
       setAddStatus({ username, message: res.message || "Request sent" });
       setResults(r => r.map(u => u.username===username ? { ...u, requested:true } : u));
+      // Remove from suggestions once request is sent
+      setSuggestions(s => s.filter(u => u.username !== username));
     } catch (err) { setAddStatus({ username, message: err.message }); }
     finally { setBusyId(null); }
   };
@@ -715,7 +724,46 @@ function FriendsView({ onOpenDm }) {
   const offline = friends.filter(f => f && !f.online);
 
   return (
-    <div style={{ padding:"1.5rem",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"1.5rem",alignItems:"start" }}>
+    <div style={{ padding:"1.5rem", display:"flex", flexDirection:"column", gap:"1.5rem" }}>
+
+      {/* ── People you may know ───────────────────────────────────── */}
+      {suggestions.length > 0 && (
+        <div>
+          <SectionLabel>✦ People You May Know</SectionLabel>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:"0.8rem" }}>
+            {suggestions.filter(u=>u?.id&&u?.username).map(u => (
+              <Card key={u.id} style={{ padding:"1rem", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.6rem", textAlign:"center" }}>
+                <Avatar name={u.username} size={46} online={u.online} color={u.avatarColor || C.cyan}/>
+                <div>
+                  <div style={{ fontSize:"0.86rem", fontWeight:600, color:C.white, fontFamily:font.body }}>{u.username}</div>
+                  {u.mutualFriends > 0 && (
+                    <div style={{ fontSize:"0.68rem", color:C.dimmer, fontFamily:font.mono, marginTop:"0.15rem" }}>
+                      {u.mutualFriends} mutual friend{u.mutualFriends>1?"s":""}
+                    </div>
+                  )}
+                </div>
+                {u.requested ? (
+                  <span style={{ fontSize:"0.68rem", color:C.dimmer, fontFamily:font.mono }}>Request sent ✓</span>
+                ) : (
+                  <button onClick={()=>sendRequest(u.username)} disabled={busyId===u.username}
+                    style={{ width:"100%", padding:"0.42rem 0", background:`linear-gradient(135deg,${C.cyan}22,${C.magenta}11)`,
+                      border:`1px solid ${C.cyan}55`, color:C.cyan, fontFamily:font.display, fontWeight:900,
+                      fontSize:"0.68rem", letterSpacing:"0.08em", textTransform:"uppercase",
+                      borderRadius:4, cursor:"pointer", transition:"all 0.18s",
+                      opacity:busyId===u.username?0.6:1 }}
+                    onMouseEnter={e=>{e.currentTarget.style.background=`${C.cyan}28`;}}
+                    onMouseLeave={e=>{e.currentTarget.style.background=`linear-gradient(135deg,${C.cyan}22,${C.magenta}11)`;}}>
+                    {busyId===u.username ? "…" : "Add Friend"}
+                  </button>
+                )}
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Main friends + requests + search grid ─────────────────── */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:"1.5rem", alignItems:"start" }}>
       {/* Friends list */}
       <Card style={{ padding:"1rem 0.5rem" }}>
         {friends.length === 0 ? (
@@ -797,6 +845,7 @@ function FriendsView({ onOpenDm }) {
           )}
         </div>
       </Card>
+      </div> {/* end inner grid */}
     </div>
   );
 }
