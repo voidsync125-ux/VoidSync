@@ -215,4 +215,65 @@ router.get("/search", requireAuth, async (req, res) => {
   }
 });
 
+// ── GET /api/friends/suggestions?limit=12 ───────────────────────────
+// Returns users who are NOT already friends with the current user,
+// sorted by mutual friend count (most mutuals first) — shown as
+// "People you may know" on the Friends page before the user searches.
+router.get("/suggestions", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 12, 30);
+
+    // Get ids to exclude: self + existing friends + users we've already
+    // sent a pending request to (so we don't re-suggest them)
+    const FriendRequestModel = require("../models/FriendRequest");
+    const sentRequests = await FriendRequestModel.find({
+      from: req.user._id,
+      status: "pending",
+    }).select("to");
+    const sentToIds = sentRequests.map((r) => r.to);
+
+    const excludeIds = [
+      req.user._id,
+      ...req.user.friends,
+      ...sentToIds,
+    ];
+
+    // Fetch a pool of candidates (not in excludeIds)
+    const candidates = await User.find({
+      _id: { $nin: excludeIds },
+    })
+      .select("username avatarColor status friends")
+      .limit(60); // fetch more than needed so we can sort by mutuals
+
+    // Count mutual friends for each candidate
+    const myFriendSet = new Set(req.user.friends.map((f) => f.toString()));
+
+    const withMutuals = candidates.map((u) => {
+      const mutuals = (u.friends || []).filter((fid) =>
+        myFriendSet.has(fid.toString())
+      ).length;
+      return {
+        id: u._id,
+        username: u.username,
+        avatarColor: u.avatarColor,
+        online: u.status === "online",
+        mutualFriends: mutuals,
+        requested: false,
+      };
+    });
+
+    // Sort by mutual count descending, then shuffle within same-mutual
+    // groups so repeat visits feel fresh
+    withMutuals.sort((a, b) => {
+      if (b.mutualFriends !== a.mutualFriends) return b.mutualFriends - a.mutualFriends;
+      return Math.random() - 0.5;
+    });
+
+    res.json({ suggestions: withMutuals.slice(0, limit) });
+  } catch (err) {
+    console.error("Friend suggestions error:", err);
+    res.status(500).json({ error: "Failed to load suggestions" });
+  }
+});
+
 module.exports = router;
